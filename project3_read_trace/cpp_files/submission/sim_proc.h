@@ -1,14 +1,13 @@
-#ifndef SIM_PROC_H
-#define SIM_PROC_H
-#define exTend extern
+#ifndef __SUPERSCALAR_PIPELINE__
+#define __SUPERSCALAR_PIPELINE__
 
 
-exTend   unsigned int  rob_size, iq_size, width, CACHE_SIZE, P,  Program_Count,  number_of_cycles;
-exTend char* trace_file;
+
+extern   unsigned int  rob_size, iq_size, width, CACHE_SIZE, P,  Program_Count,  number_of_cycles;
+extern char* trace_file;
 void func_retire();
 void func_writeback();
 void func_execute();
-bool checker2(int );
 void func_issue();
 void func_dispatch();
 void func_regRead();
@@ -16,9 +15,12 @@ void func_rename();
 void func_decode();
 int  func_fetch();
 bool Advance_Cycle();
-bool checker(int,unsigned int);
+bool check_space_rob();
+bool check_space_iq();
+bool vac_in_ROB();
+bool vac_in_IQ();
+bool is_Ready(  unsigned int  index);
 bool progress_exc();
-
 
 struct pipeline {
     unsigned long int address,transfer_dy;
@@ -29,23 +31,12 @@ struct pipeline {
     bool valid;
 } ;
 
-struct EXECUTE {
-    pipeline instruction;
-    int age;
-} ;
-
-
 struct ROB {
     bool valid,ready;
     unsigned int  transfer_dy,address;
     int dest;
     pipeline instruction;
-    
 } ;
-
-
-
-
 
 struct RMT {
     bool valid;
@@ -57,7 +48,10 @@ struct IQ {
     pipeline instruction;
 } ;
 
-
+struct EXECUTE {
+    pipeline instruction;
+    int age;
+} ;
 
 #endif
 

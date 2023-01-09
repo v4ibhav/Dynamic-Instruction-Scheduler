@@ -12,24 +12,35 @@
 using namespace std;
 #define foru(i,n) for(unsigned int i=0;i<n;i++)
 
+// These variables must be consistent throughout the simulation.
 unsigned int  rob_size, iq_size, width, CACHE_SIZE, P,  Program_Count=0,  number_of_cycles;
 char * trace_file;
-ifstream infile;    
+ifstream infile;    // Input file stream
 
+// rob, as well head and tail
   unsigned int  head=2, tail=2;
 vector<ROB> rob = {};
 vector<RMT> rmt(67);
 int ody,oSRC1,oSRC2,oDSR;
 int oFE,oDE,oRN,oRR,oDI,oIS,oEX,oWB,oRT1,oRT2,oFU;
 
+// Issue Queue
 vector<IQ> iq = {};
 
+// Execution list
 vector<EXECUTE> Execution = {};
 
+// FE_continue indicates where we have reached the end of the sequence.
   unsigned int  FE_continue=0;
 
-deque<pipeline> DE_register, RN_register, RR_register, DI_register, Writeback_store;
+// Global pipeline registers themselves.
+deque<pipeline> DE_register;
+deque<pipeline> RN_register;
+deque<pipeline> RR_register;
+deque<pipeline> DI_register;
+deque<pipeline> Writeback_store;
 
+// Main routine
 int main(int argc, char ** argv) {
     if(argc != 5) {
         cout << "Invalid amount of arguments for 'sim_ds'. Please include 6 " <<
@@ -59,6 +70,10 @@ int main(int argc, char ** argv) {
     // inside the Fetch() function.
     //
     ///////////////////////////////////////////////////////////////////////////////////////////////////////
+    
+
+
+    // Pipeline routine
     do {
         func_retire();
         func_writeback();
@@ -74,12 +89,15 @@ int main(int argc, char ** argv) {
 
     ipc = (double)  Program_Count / (double)  number_of_cycles;
     // foru(i,Program_Count)
-    
+    // {
+        
         
     // }
 
     printf("# === Simulator Command =========\n");
+    // printf("%s\n",trace_file);
     printf("# ./sim %s %s %s %s\n",argv[1],argv[2],argv[3],trace_file);
+
     printf("# === Processor Configuration ===\n"); 
 
             cout<<"# ROB_SIZE = "<<argv[1]<<endl;
@@ -96,37 +114,22 @@ int main(int argc, char ** argv) {
 bool Advance_Cycle() {
      number_of_cycles++;
     if(FE_continue || DE_register.size() || RN_register.size() || RR_register.size()
-            || DI_register.size() || !checker2(0) || Execution.size()
-            || Writeback_store.size() || !checker2(1)) return true;
+            || DI_register.size() || !vac_in_IQ() || Execution.size()
+            || Writeback_store.size() || !vac_in_ROB()) return true;
     else return false;
 }
 
-bool checker2(int i)
-{
+bool vac_in_IQ() {
     bool empty = true;
-
-    switch (i)
-    {
-    case 0:
-        /* code */
-        {
-            foru(i,iq_size)
-            {
-                if(iq[i].valid) empty = false;
-            } 
-            return empty;
-        }
-        break;
-    case 1:
-        {
-            foru(i,rob_size){
-                if(rob[i].valid) empty = false;
-            }
-            return empty;
-        }
-        break;
-    }
-
+    for(  unsigned int  i=0; i<iq_size; i++)
+        if(iq[i].valid) empty = false;
+    return empty;
+}
+bool vac_in_ROB() {
+    bool empty = true;
+    for(  unsigned int  i=0; i<rob_size; i++)
+        if(rob[i].valid) empty = false;
+    return empty;
 }
 
 

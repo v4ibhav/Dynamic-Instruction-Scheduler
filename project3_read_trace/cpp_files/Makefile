@@ -2,14 +2,16 @@ CC = g++
 OPT = -O3
 #OPT = -g
 WARN = -Wall
-CFLAGS = $(OPT) $(WARN) $(INC) $(LIB)
+CFLAGS = $(OPT) $(WARN) $(INC) std=c++1y $(LIB)
+
 
 # List all your .cc/.cpp files here (source files, excluding header files)
-SIM_SRC = sim_proc.cc
+SIM_SRC =  sim_proc.cc pipeline.cc 
+# sim_proc.cc fetch.cc decode.cc regRead.cc dispatch.cc issue.cc execute.cc writeback.cc retire.cc
 
 # List corresponding compiled object files here (.o files)
-SIM_OBJ = sim_proc.o
- 
+SIM_OBJ =  sim_proc.o  pipeline.o 
+#  sim_proc.o fetch.o decode.o regRead.o dispatch.o issue.o execute.o writeback.o retire.o
 #################################
 
 # default rule
@@ -21,7 +23,7 @@ all: sim
 # rule for making sim
 
 sim: $(SIM_OBJ)
-	$(CC) -o sim $(CFLAGS) $(SIM_OBJ) -lm
+	$(CC) -o sim -std=c++1y $(CFLAGS) $(SIM_OBJ) -lm
 	@echo "-----------DONE WITH sim-----------"
 
 

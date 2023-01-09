@@ -1,0 +1,494 @@
+#include <deque>
+#include <vector>
+#include <iostream>
+#include "sim_proc.h"
+#include <cstdlib>
+#include <fstream>
+#include <sstream>
+
+
+
+#define foru(i,n) for(unsigned int i=0;i<n;i++)
+#define itern(it,en) for(auto it = en.begin();it!=en.end();it++)
+#define VALID 1
+#define INVALID -1
+#define NON 0
+#define nonblock width*5
+extern std::vector<IQ> iq;
+
+int fail = 0;
+
+extern int ody,oFU,oFE,oSRC1,oSRC2,oDSR;
+extern int oFE,oDE,oRN,oRR,oDI,oIS,oEX,oWB,oRT1,oRT2;
+
+
+extern std::deque<pipeline> Writeback_store;
+extern std::deque<pipeline> RN_register;
+extern std::deque<pipeline> RR_register;
+extern std::deque<pipeline> DI_register;
+extern std::deque<pipeline> DE_register;
+
+extern std::vector<RMT> rmt;
+extern std::vector<ROB> rob;
+extern   unsigned int  head, tail;
+extern std::vector<RMT> rmt;
+extern   unsigned int  width;
+extern   unsigned int  RN_time;
+extern std::deque<pipeline> Writeback_store;
+extern std::vector<EXECUTE> Execution;
+
+
+extern   unsigned int   number_of_cycles;
+extern   unsigned int   Program_Count;
+
+using namespace std;
+
+void func_rename(){
+    itern(j,RN_register)
+    {
+            j->RN = (RN_register.size() && (j->RN == -1))? number_of_cycles:j->RN ;
+
+    }
+    if((RR_register.size() == width) || check_space_rob() != NON) {
+                return;
+            }
+
+    foru(i,width) {
+        if(RN_register.size() != NON) {
+
+            rob[tail].valid = true;
+            int addre_front = RN_register.front().address;
+            rob[tail].address = addre_front;
+            rob[tail].transfer_dy = RN_register.front().transfer_dy;
+            rob[tail].ready = false;
+            rob[tail].instruction = RN_register.front();
+
+
+
+            if(RN_register.front().src_1 != INVALID) {
+                RN_register.front().rn_src_1 =(rmt[RN_register.front().src_1].valid)? rmt[RN_register.front().src_1].rob_tag:RN_register.front().rn_src_1;
+            }
+
+            // func_rename source register two similarly.
+            if(RN_register.front().src_2 != INVALID) {
+                RN_register.front().rn_src_2 =(rmt[RN_register.front().src_2].valid)? rmt[RN_register.front().src_2].rob_tag:RN_register.front().rn_src_2;
+                
+                
+                
+            }
+
+            // map the destination register to the rob and rmt and func_rename the destination register.
+            rob[tail].dest = RN_register.front().dest;
+            if(RN_register.front().dest != INVALID) {
+                rmt[RN_register.front().dest].valid = true;
+                rmt[RN_register.front().dest].rob_tag = tail;
+            }
+            RN_register.front().rn_dest = tail;
+
+            // move the tail down for the next instruction.
+            tail+=1;
+            tail = (tail == rob_size)?0:tail;
+
+            // finally, send the instruction on its merry way.
+            RR_register.push_back(RN_register.front());
+            RN_register.pop_front();
+        }
+    }
+    return;
+}
+
+bool check_space_rob() {
+    unsigned int  empty_slots=rob_size;
+    foru(i,rob.size()) {
+        if(rob[i].valid) empty_slots--;
+    }
+    if(empty_slots<width)
+    {
+        return true;
+    }
+    else{
+        return false;
+    }
+}
+
+
+void func_retire(){
+
+    if(vac_in_ROB() != NON) return;
+
+   foru(i,rob.size()) {
+        if(rob[i].ready  )
+        {
+            rob[i].instruction.RT1 = ((rob[i].instruction.RT1 == INVALID))?number_of_cycles:rob[i].instruction.RT1;
+        }
+   }
+foru(i,width) {
+   if(rob[head].ready)
+   {
+
+            if(rob[head].valid) {
+            
+            rob[head].instruction.RT2 =  number_of_cycles - rob[head].instruction.RT1+1;
+            ody        =  rob[head].instruction.transfer_dy;
+            oFU    =    rob[head].instruction.op_type;
+            oFE    =rob[head].instruction.FE;
+            oSRC1    =rob[head].instruction.src_1;
+            oSRC2    =rob[head].instruction.src_2;
+            oFE    =rob[head].instruction.FE;
+            oDE    =rob[head].instruction.DE;
+            oRN    =rob[head].instruction.RN;
+            oRR    =rob[head].instruction.RR;
+            oDI    =rob[head].instruction.DI;
+            oIS    =rob[head].instruction.IS;
+            oEX    =rob[head].instruction.EX;
+            oWB    =rob[head].instruction.WB;
+            oRT1    =rob[head].instruction.RT1;
+            oRT2 = rob[head].instruction.RT2;
+            oDSR = rob[head].instruction.dest;
+            cout << ody << " "<< "fu{" << oFU<< "} ";
+        cout << "src{" << oSRC1 << "," <<oSRC2 << "} ";
+        cout<< "dst{" <<oDSR << "} ";
+        cout<< "FE{" << oFE << ","<< oDE-oFE <<"} ";
+        cout<< "DE{" << oDE << ","<< oRN-oDE <<"} ";
+        cout<< "RN{" << oRN << ","<< oRR-oRN <<"} ";
+        cout<< "RR{" << oRR << ","<< oDI-oRR    <<"} ";
+        cout<< "DI{" << oDI << ","<< oIS-oDI<<"} ";
+        cout<< "IS{" << oIS << ","<< oEX-oIS<<"} ";
+        cout<< "EX{" << oEX << ","<< oWB-oEX<<"} ";
+        cout<< "WB{" << oWB << ","<< oRT1-oWB<<"} ";
+        cout<< "RT{" << oRT1 << ",";
+        cout<< oRT2 << "}  "<< endl;
+            
+
+            
+
+            if(rob[head].instruction.dest != INVALID) {
+                if(rob[head].instruction.rn_dest == rmt[rob[head].instruction.dest].rob_tag) 
+                {
+                    rmt[rob[head].instruction.dest].valid = false;
+                    rmt[rob[head].instruction.dest].rob_tag = -1;
+                }
+            }
+            rob[head].valid = 0;
+            rob[head].instruction.address = 0;
+            head++;
+            if(head == rob_size) head = 0;
+           
+        }
+   }
+}
+    return;
+}
+
+void func_writeback(){
+    while(Writeback_store.empty() == NON) {
+        itern(it,Writeback_store) {
+            if(Writeback_store.size() != NON)
+            {
+                Writeback_store.front().WB = (Writeback_store.front().WB == INVALID)?number_of_cycles:Writeback_store.front().WB;
+            } 
+        }
+
+        // Mark the instruction as ready within the rob.
+        foru( j , rob_size) {
+            if(rob[j].valid) {
+                if (rob[j].instruction.transfer_dy == Writeback_store.front().transfer_dy) {
+                    rob[j].ready = true;
+                    itern(it,Writeback_store) {
+                        if(Writeback_store.size() != NON)
+                        {
+                            Writeback_store.front().WB = (Writeback_store.front().WB == INVALID)?number_of_cycles:Writeback_store.front().WB;
+                        } 
+                        
+                    }
+                    rob[j].instruction = Writeback_store.front();
+                    Writeback_store.pop_front();
+                    if(Writeback_store.size() == NON) break;
+                }
+            }
+        }
+    }
+    return;
+}
+
+void func_execute(){
+
+    if(Execution.size() == 0) return;
+    foru(i , Execution.size()) {
+        Execution[i].instruction.EX = (Execution[i].instruction.EX == INVALID)?number_of_cycles:Execution[i].instruction.EX;
+        Execution[i].age--;
+    }
+    while(progress_exc()){
+        foru( i ,Execution.size()) {
+            // If it is finishing execution this cycle...
+            if(Execution[i].age == NON) {
+                // Wake up iq by matching rob values and setting it to ready.
+                foru( j,iq_size) {
+                    if(iq[j].instruction.rn_src_1 ==Execution[i].instruction.rn_dest)
+                    {
+                        iq[j].instruction.rn_src_1 = (iq[j].instruction.rn_src_1 != INVALID)?-1:iq[j].instruction.rn_src_1;
+                    }  
+                    
+                    if(iq[j].instruction.rn_src_2 == Execution[i].instruction.rn_dest)
+                    {
+                        iq[j].instruction.rn_src_2 = (iq[j].instruction.rn_src_2 != INVALID)?-1:iq[j].instruction.rn_src_2;
+
+                    }
+                }
+            
+                // Wake up DI
+                itern(j,DI_register) {
+                    if(DI_register.size() == 0) break;
+                    j->rn_src_1 = (j->rn_src_1 == Execution[i].instruction.rn_dest)?-1:j->rn_src_1;
+                    j->rn_src_2 = (j->rn_src_2 == Execution[i].instruction.rn_dest)?-1:j->rn_src_2;
+
+                }
+
+                // Wake up RR
+                itern(j,DI_register) {
+                    if(RR_register.size() == 0) break;
+                    
+                    j->rn_src_1 = (j->rn_src_1 == Execution[i].instruction.rn_dest)?-1:j->rn_src_1;
+                    j->rn_src_2 = (j->rn_src_2 == Execution[i].instruction.rn_dest)?-1:j->rn_src_2;
+
+                }
+
+                if(Writeback_store.size() == nonblock) {
+                    return;
+                }
+                Execution[i].instruction.valid = true;
+                pipeline instruction = Execution[i].instruction;
+                Writeback_store.push_back(instruction);
+                Execution.erase(Execution.begin()+i);
+            }
+        }
+    }
+    return;
+}
+
+bool progress_exc() {
+    if(fail)
+    {
+        Writeback_store.pop_back();
+        Execution.erase(Execution.begin());
+
+    }
+    bool need = false;
+    for(  unsigned int  i=0; i<Execution.size(); i++) {
+        need = (!Execution[i].age)?true:need;
+    }
+    return need;
+}
+
+void func_issue(){
+
+    foru(i,width) {
+        int min=INT32_MAX;
+        int min_index=-1;
+        if(Execution.size() == nonblock) return;
+
+        foru(j,iq_size) {
+            if(iq[j].valid == NON) continue;
+            if(iq[j].instruction.rn_src_1 != INVALID) continue;
+            if(iq[j].instruction.rn_src_2 != INVALID) continue;
+            if(iq[j].valid) {
+                if(iq[j].instruction.FE < min && is_Ready(j)){
+                    min = iq[j].instruction.FE;
+                    min_index = j;
+                }
+            }
+        }
+
+        foru( j,iq_size) {
+            if(iq[j].valid == NON) continue;
+            if(iq[j].valid) {
+                iq[j].instruction.IS = (iq[j].instruction.IS == -1)? number_of_cycles:iq[j].instruction.IS;
+
+            }
+        }
+
+        // If there wasn't an oldest valid instruction, leave.
+        if(min_index == INVALID) return;
+
+        // add the instruction to the execute list.
+        int TTL;
+        switch (iq[min_index].instruction.op_type)
+        {
+        case 0:
+            TTL = 1;
+            break;
+        case 1:
+            TTL = 2;
+            break;
+        case 2:
+            TTL = 5;
+            break;
+        }
+        EXECUTE ex_instruction = {iq[min_index].instruction, TTL};
+        Execution.push_back(ex_instruction);
+        // invalidate that instruction in the iq.
+        iq[min_index].valid=0;
+    }
+    return;
+}
+
+bool is_Ready(  unsigned int  index) {
+    bool red = true;
+    if(fail)
+    {
+        // Writeback_store.pop_back();
+        Execution.erase(Execution.begin());
+
+    }
+    if(iq[index].instruction.rn_src_1 != -1 || iq[index].instruction.rn_src_2 != -1) red = false;
+    return red;
+}
+
+void func_dispatch(){
+
+
+    // set first cycle and duration of this instruction.
+        itern(it,DI_register) {
+            it->DI = (DI_register.size() && it->DI == -1)? number_of_cycles:it->DI;
+        }
+
+    // If there isn't enough room in the iq for the entire pipeline set, do nothing.
+    if(check_space_iq() != NON) {
+        return;
+    }
+    // Otherwise move everything to the iq.
+    else if(DI_register.size() != NON) {
+        while(DI_register.size()) {
+            foru(j,iq_size) {
+                if (iq[j].valid != NON) continue;
+                if(DI_register.front().rn_src_1 != INVALID) {
+                    DI_register.front().rn_src_1 = (rob[DI_register.front().rn_src_1].ready)?-1:DI_register.front().rn_src_1;
+                    }
+                if(DI_register.front().rn_src_2 != INVALID) {
+                    DI_register.front().rn_src_2 = (rob[DI_register.front().rn_src_2].ready)?-1:DI_register.front().rn_src_2;
+                    }
+                
+
+                itern(it ,DI_register) {
+                    it->DI =(DI_register.size() && it->DI == -1)?  number_of_cycles: it->DI;
+                }
+
+                iq[j].valid = true;
+                iq[j].instruction = DI_register.front();
+                break;
+            }
+            if(!DI_register.size()) break;
+            else DI_register.pop_front();
+        }
+    }
+
+    return;
+}
+
+bool check_space_iq() {
+      unsigned int  empty_slots=iq_size;
+    foru(i,iq_size) {
+        if(iq[i].valid != NON) empty_slots--;
+
+    }
+    if(empty_slots < width)
+    {
+        return true;
+    }
+    else return false;
+}
+
+void func_regRead(){
+    foru( i,width) {
+
+        // set first cycle and duration of this instruction.
+        itern(it,RR_register) {
+            it->RR = (RR_register.size() && it->RR == -1)? number_of_cycles:it->RR;
+        }
+        unsigned int tem = DI_register.size();
+        if(tem == width) {
+            return;
+        }
+        else if(RR_register.size() != NON) {
+            if(RR_register.front().rn_src_1 != -1) {
+                RR_register.front().rn_src_1 =(rob[RR_register.front().rn_src_1].ready)? -1 :RR_register.front().rn_src_1;
+               
+            }
+            if(RR_register.front().rn_src_2 != -1) {
+                RR_register.front().rn_src_2 =(rob[RR_register.front().rn_src_2].ready)? -1 :RR_register.front().rn_src_2;
+
+            }
+            itern(it,RR_register)
+            {
+                it->RR = (RR_register.size() && it->RR == -1)? number_of_cycles:it->RR;
+
+            }
+
+            // Finally, move this pipeline to the DI register.
+            DI_register.push_back(RR_register.front());
+            RR_register.pop_front();
+        }
+    }
+    return;
+}
+
+void func_decode(){
+    itern(j,DE_register)
+    {
+        j->DE = (DE_register.size() && (j->DE == -1))? number_of_cycles:j->DE;
+
+    }
+    foru(i,width)
+    {
+        if(RN_register.size() == width) {
+            return;
+        }
+        else if(DE_register.size() != NON) {
+            RN_register.push_back(DE_register.front());
+            DE_register.pop_front();
+        }
+    }
+    return;
+}
+
+
+extern ifstream infile;
+
+
+int  func_fetch() {
+    static   unsigned int  stall = 0;
+    string line;                    
+    string ADDRESS_OF;             
+    unsigned long int address;      
+    int   op_type;         
+    int   dest,src_1,src_2;
+    foru(i,width) {
+        if(CACHE_SIZE == 0) {
+            if(DE_register.size() == width) {
+                stall++;
+                return 1;
+            }
+            getline(infile, line);
+            istringstream iss(line);
+            if(!(iss >> ADDRESS_OF >> op_type >> dest >> src_1 >> src_2))
+                return 0;
+        }
+        ADDRESS_OF = "0x" + ADDRESS_OF;
+        sscanf(ADDRESS_OF.c_str(), "%016lx", &address);
+        pipeline instruction;
+        instruction.address = address;
+        instruction.op_type = op_type;
+        instruction.dest    = dest;
+        instruction.rn_dest = -1;
+        instruction.src_1   = src_1;
+        instruction.src_2   = src_2;
+        instruction.valid = false;
+        instruction.FE =  number_of_cycles;
+        instruction.DE=instruction.RN=instruction.RR=instruction.RT1 =instruction.DI=instruction.IS=instruction.EX=instruction.WB=instruction.rn_dest = instruction.rn_src_1 = instruction.rn_src_2 =  -1;
+        instruction.transfer_dy =  Program_Count;
+        Program_Count+=1;
+        DE_register.push_back(instruction);
+    }
+    stall=0;
+    return 1;
+}
