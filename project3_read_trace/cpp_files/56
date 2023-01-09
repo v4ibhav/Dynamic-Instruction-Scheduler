@@ -1,0 +1,6 @@
+rob_size:256 iq_size:32 width:4 tracefile:gcc_trace.txt
+
+4set rename to valid 
+set rename to valid 
+set rename to valid 
+set rename to valid 
